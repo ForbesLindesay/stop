@@ -5,13 +5,16 @@ var readdirp = require('readdirp');
 var express = require('express');
 var hyperquest = require('hyperquest');
 var mkdir = require('mkdirp').sync;
+var rfile = require('rfile');
 
 var dirname = require('path').dirname;
 var join = require('path').join;
+var resolve = require('path').resolve;
 var write = require('fs').createWriteStream;
 
 module.exports = Application;
 function Application(isStatic) {
+  if (!(this instanceof Application)) return new Application(isStatic);
   this.isStatic = isStatic;
   if (isStatic) {
     process.env.NODE_ENV = 'production';
@@ -35,12 +38,13 @@ Application.prototype.get = function (path) {
 
 Application.prototype.favicon = function (filepath, options) {
   this.paths.push('/favicon.ico');
-  this.express.use(express.favicon(filepath, options));
+  this.express.use(express.favicon(rfile.resolve(filepath, {exclude: [__filename]}), options));
   return this;
 };
 
 Application.prototype.file = function (path, filepath) {
   this.paths.push(path);
+  var filepath = rfile.resolve(filepath, {exclude: [__filename]});
   this.express.get(path, function (req, res) {
     res.sendfile(filepath);
   });
@@ -52,6 +56,7 @@ Application.prototype.directory = function (path, filepath, opts) {
   var options = {
     hidden: opts.hidden || false
   };
+  filepath = resolve(directory(), filepath);
   this.paths.push(function () {
     return readdirp({
       directoryFilter: '!node_modules',
@@ -63,6 +68,16 @@ Application.prototype.directory = function (path, filepath, opts) {
   this.express.use(path, express.static(filepath, options));
   return this;
 };
+
+function directory(exclude) {
+  var stack = callsite();
+  for (var i = 0; i < stack.length; i++) {
+    var filename = stack[i].getFileName();
+    if (filename !== __filename && (!exclude || (exclude.indexOf(filename) === -1)))
+      return dirname(filename);
+  }
+  throw new Error('Could not resolve directory');
+}
 
 Application.prototype.readPaths = function (cb) {
   var done = false;

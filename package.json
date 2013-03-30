@@ -13,6 +13,7 @@
     "mkdirp": "~0.3.5",
     "hyperquest": "~0.1.0",
     "readdirp": "~0.2.4",
-    "express": "~3.1.0"
+    "express": "~3.1.0",
+    "rfile": "~1.0.0"
   }
 }
