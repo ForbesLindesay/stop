@@ -44,7 +44,7 @@ function fetch(site, dir, options, callback) {
   var requested = {}
   var inProgress = {}
   var throttle = throat(options.throttle || 4)
-  return file(pathname).nodeify(callback)
+  return Q.all([file(pathname), file('/favicon.ico')]).nodeify(callback)
   function file(pth) {
     pth = pth.replace(/(?:#|\?).*$/, '')
     if (!filter(pth)) return Q(null)
