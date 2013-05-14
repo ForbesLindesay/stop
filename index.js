@@ -1,172 +1,217 @@
 "use strict";
 
-var through = require('through');
-var readdirp = require('readdirp');
-var express = require('express');
-var hyperquest = require('hyperquest');
-var mkdir = require('mkdirp').sync;
-var rfile = require('rfile');
+var url = require('url')
+var fs = require('fs')
+var join = require('path').join
+var dirname = require('path').dirname
 
-var dirname = require('path').dirname;
-var join = require('path').join;
-var resolve = require('path').resolve;
-var write = require('fs').createWriteStream;
+var js = require('uglify-js').minify
+var css = require('css')
+var throat = require('throat')
+var Q = require('q')
+var hyperquest = require('hyperquest')
+var concatStream = require('concat-stream')
+var htmlparser = require('htmlparser')
+var mkdir = Q.denodeify(require('mkdirp'))
+var Minimatch = require('minimatch').Minimatch
 
-module.exports = Application;
-function Application(isStatic) {
-  if (!(this instanceof Application)) return new Application(isStatic);
-  this.isStatic = isStatic;
-  if (isStatic) {
-    process.env.NODE_ENV = 'production';
+module.exports = fetch
+function fetch(site, dir, options, callback) {
+  dir = dir.toString()
+  if (typeof site === 'number') {
+    site = 'http://localhost:' + site
   }
-  this.express = express();
-  this.paths = [];
-}
+  if (!/^https?:\/\//.test(site)) site = 'http://' + site
 
-Application.prototype.get = function (path) {
-  if (arguments.length === 1) {
-    return this.express.get(path);
+  site = url.parse(site, false, true)
+  var pathname = site.pathname
+  site.pathname = null
+  site.search = null
+  site.query = null
+  site.hash = null
+  site = url.format(site)
+
+  if (typeof options === 'function') {
+    callback = options
+    options = undefined
   }
-  if (/^\/(?:[a-z0-9\-\_\.]\/?)*$/.test(path)) {
-    this.paths.push(path);
-    this.express.get.apply(this.express, arguments);
-  } else {
-    throw new Error('Paths for stop can only be `a-z`, `0-9`, `_`, `-` and `.`');
-  }
-  return this;
-};
 
-Application.prototype.favicon = function (filepath, options) {
-  this.paths.push('/favicon.ico');
-  this.express.use(express.favicon(rfile.resolve(filepath, {exclude: [__filename]}), options));
-  return this;
-};
+  options = options || {}
+  var filter = makeFilter(options.filter)
+  var minifyJS = options.minifyJS || options['minify-js']
+  var minifyCSS = options.minifyCSS || options['minify-css']
 
-Application.prototype.file = function (path, filepath) {
-  this.paths.push(path);
-  var filepath = rfile.resolve(filepath, {exclude: [__filename]});
-  this.express.get(path, function (req, res) {
-    res.sendfile(filepath);
-  });
-  return this;
-};
-
-Application.prototype.directory = function (path, filepath, opts) {
-  opts = opts || {};
-  var options = {
-    hidden: opts.hidden || false
-  };
-  filepath = resolve(directory(), filepath);
-  this.paths.push(function () {
-    return readdirp({
-      directoryFilter: '!node_modules',
-      fileFilter: filterHidden(!options.hidden),
-      root: filepath
+  var requested = {}
+  var inProgress = {}
+  var throttle = throat(options.throttle || 4)
+  return file(pathname).nodeify(callback)
+  function file(pth) {
+    pth = pth.replace(/(?:#|\?).*$/, '')
+    if (!filter(pth)) return Q(null)
+    if (requested['key:' + pth.toLowerCase()]) return Q(null)
+    requested['key:' + pth.toLowerCase()] = true
+    inProgress[pth.toLowerCase()] = true
+    return Q(throttle(function () {
+      return Q.promise(function (resolve, reject) {
+        hyperquest(site + pth, function (err, res) {
+          if (err) return reject(err)
+          res.pause()
+          return resolve(res)
+        })
+      })
+      .then(function (res) {
+        return onResponse(pth, res)
+      })
+    }))
+    .then(function (deps) {
+      delete inProgress[pth.toLowerCase()]
+      //console.dir(inProgress)
+      return Q.all(deps.map(file))
     })
-    .pipe(addBase(path));
-  });
-  this.express.use(path, express.static(filepath, options));
-  return this;
-};
-
-function directory(exclude) {
-  var stack = callsite();
-  for (var i = 0; i < stack.length; i++) {
-    var filename = stack[i].getFileName();
-    if (filename !== __filename && (!exclude || (exclude.indexOf(filename) === -1)))
-      return dirname(filename);
   }
-  throw new Error('Could not resolve directory');
-}
+  function onResponse(pth, res) {
+    console.log(res.statusCode + ': ' + pth)
+    if (res.statusCode === 301 || res.statusCode === 302 || res.statusCode === 303 || res.statusCode === 307 || res.statusCode === 308) {
+      if (!res.headers.location) return []
+      var location = url.resolve(site + pth, res.headers.location)
+      return location.indexOf(site) === 0 ? [location.substr(site.length)] : []
+    } else if (res.statusCode != 200) {
+      return []
+    } else if ((res.headers['content-type'] && res.headers['content-type'].toLowerCase().indexOf('html') >= 0) || 
+                (!/\.[^\/]+$/.test(pth) && !res.headers['content-type'])) {
+      return concat(res)
+        .then(function (res) {
+          var deps = parseDeps(res.toString())
+            .map(function (dep) {
+              return url.resolve(site + pth, dep)
+            })
+            .filter(function (dep) {
+              return dep.indexOf(site) === 0
+            })
+            .map(function (dep) {
+              return dep.substr(site.length)
+            })
+          return writeFile(join(dir, /\.[a-zA-Z]{1,6}/.test(pth) ? pth : pth + '/index.html'), res).thenResolve(deps)
+        })
+    } else if (res.headers['content-type'] && res.headers['content-type'].toLowerCase().indexOf('css') >= 0) {
+      return concat(res)
+        .then(function (res) {
+          var deps = []
 
-Application.prototype.readPaths = function (cb) {
-  var done = false;
-  var pending = this.paths.length;
-  var paths = [];
-  for (var i = 0; i < this.paths.length; i++) {
-    if (typeof this.paths[i] === 'string') {
-      paths.push(this.paths[i]);
-      --pending;
-    } else if (typeof this.paths[i] === 'function') {
-      var strm = this.paths[i]();
-      strm.on('data', function (path) {
-        paths.push(path);
-      });
-      strm.on('end', function () {
-        if (0 === --pending) return cb(null, paths);
-      });
-    }
-  }
-  if (0 === pending) return cb(null, paths);
-}
+          try {
+            var parsed = css.parse(res.toString())
+            res = css.stringify(parsed, {compress: true})
+          } catch (ex) {
+            //just don't minify
+          }
 
-Application.prototype.download = function (port, path, outputDir, callback) {
-  var dest = join(outputDir, path.replace(/(\/[^\.]*)$/, '$1/index.html').replace(/\/+/g, '/'));
-  console.dir(dest);
-  mkdir(dirname(dest));
-  hyperquest('http://localhost:' + port + path)
-    .pipe(write(dest))
-    .on('close', function () {
-      callback();
-    });
-};
+          return writeFile(join(dir, pth), res).thenResolve(deps)
+        })
+    } else if (minifyJS && res.headers['content-type'] && res.headers['content-type'].toLowerCase().indexOf('javascript') >= 0) {
+      return concat(res)
+        .then(function (res) {
+          var deps = []
 
-Application.prototype.run = function (outputDir, port, callback) {
-  callback = callback || function (err, port) {
-    if (err) throw err;
-    if (port) {
-      console.log('listening on localhost:' + port);
+          try {
+            res = js(res).code
+          } catch (ex) {
+            //just don't minify
+          }
+
+          return writeFile(join(dir, pth), res).thenResolve(deps)
+        })
     } else {
-      console.log('site build complete');
+      return write(join(dir, pth), res).thenResolve([])
     }
   }
-  if (this.isStatic) {
-    var self = this;
-    var express = this.express;
-    this.readPaths(function (err, paths) {
-      if (err) return callback(err);
-      express.listen(0, function () {
-        var server = this;
-        var port = server.address().port;
-        var pending = paths.length;
+}
 
-        for (var i = 0; i < paths.length; i++) {
-          self.download(port, paths[i], outputDir, function (err) {
-            if (err) return callback(err);
+function parse(domstr) {
+  var handler = new htmlparser.DefaultHandler();
+  var parser = new htmlparser.Parser(handler);
+  parser.parseComplete(domstr);
+  return handler.dom;
+}
+function concat(stream) {
+  return Q.promise(function (resolve, reject) {
+    stream.pipe(concatStream(function (err, res) {
+      if (err) return reject(err)
+      else return resolve(res)
+    }))
+    stream.resume()
+  })
+}
 
-            if (0 === --pending) {
-              server.close(function () {
-                callback();
-              });
-            }
-          })
-        }
-
-        if (pending === 0) {
-          server.close(function () {
-            callback();
-          });
-        }
-      });
-    })
-  } else {
-    this.express.listen(port, function () {
-      var port = this.address().port;
-      callback(null, port);
-    });
+function parseDeps(dom) {
+  if (typeof dom === 'string') dom = parse(dom)
+  if (Array.isArray(dom)) {
+    return dom.map(parseDeps).reduce(flatten, [])
   }
-};
-
-function filterHidden(active) {
-  if (!active) {
-    return function () { return true; }
+  if (typeof dom === 'object') {
+    return Object.keys(dom)
+      .map(function (attr) {
+        if (attr === 'attribs') {
+          if (dom[attr].src) return [dom[attr].src]
+          if (dom[attr].href) return [dom[attr].href]
+          else return []
+        } else if (typeof dom[attr] === 'string') {
+          return []
+        } else {
+          return parseDeps(dom[attr])
+        }
+      })
+      .reduce(flatten, [])
   }
-  return function (fileInfo) {
-    return fileInfo.name[0] !== '.';
+  return []
+
+  function flatten(a, b) {
+    return a.concat(b)
   }
 }
-function addBase(base) {
-  return through(function (fileInfo) {
-    this.queue((base + '/' + fileInfo.path.replace(/\\/g, '/')).replace(/\/+/g, '/'));
-  })
+
+function writeFile(path, content) {
+  return mkdir(dirname(path))
+    .then(function () {
+      return Q.nfcall(fs.writeFile, path, content)
+    })
+}
+function write(path, strm) {
+  return mkdir(dirname(path))
+    .then(function () {
+      var fstrm = strm.pipe(fs.createWriteStream(path))
+      return Q.promise(function (resolve, reject) {
+        fstrm.on('error', reject)
+        strm.on('error', reject)
+        fstrm.on('close', resolve)
+        strm.resume()
+      })
+    })
+}
+
+function makeFilter(filter) {
+  if (filter == null) return function () { return true }
+  if (typeof filter === 'function') return filter
+  if (typeof filter === 'string') {
+    filter = new Minimatch(filter, {
+      dot: true,
+      nocase: true,
+      nocomment: true
+    })
+    var res = function (path) { return filter.match(path) }
+    res.negate = filter.negate
+    return res
+  }
+  if (Array.isArray(filter) && filter.length != 0) {
+    filter = filter.map(makeFilter)
+    if (filter.every(function (f) { return f.negate })) {
+      return function (path) {
+        return filter.every(function (f) { return f(path) })
+      }
+    } else if (filter.every(function (f) { return !f.negate })) {
+      return function (path) {
+        return filter.some(function (f) { return f(path) })
+      }
+    }
+  }
+  throw new Error('The filter did not match any of the valid patterns')
 }

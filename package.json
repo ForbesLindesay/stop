@@ -1,19 +1,25 @@
 {
   "name": "stop",
-  "version": "1.1.0",
-  "description": "Simplified express for static websites.",
+  "version": "2.0.0",
+  "description": "Make a dynamic website static by downloading it.",
   "repository": {
     "type": "git",
     "url": "https://github.com/ForbesLindesay/stop.git"
   },
+  "bin": "./bin/cli.js",
   "author": "ForbesLindesay",
   "license": "MIT",
   "dependencies": {
-    "through": "~2.2.7",
+    "concat-stream": "~0.1.1",
+    "q": "~0.9.3",
     "mkdirp": "~0.3.5",
-    "hyperquest": "~0.1.0",
-    "readdirp": "~0.2.4",
-    "express": "~3.1.0",
-    "rfile": "~1.0.0"
+    "htmlparser": "~1.7.6",
+    "throat": "0.0.0",
+    "hyperquest": "~0.1.5",
+    "minimatch": "~0.2.12",
+    "optimist": "~0.4.0",
+    "toml": "~0.4.1",
+    "uglify-js": "~2.3.2",
+    "css": "~1.1.0"
   }
 }

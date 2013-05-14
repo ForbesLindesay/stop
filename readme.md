@@ -1,69 +1,87 @@
 # Stop
 
-  Simplified express for static websites.
+  Make a dynamic website static by downloading it.
 
-  `Stop` offers an API similar to express and is compatible with express middleware, but can automatically generate a static version of any website.
+## Command Line
 
-## Example
+### Installation
 
-```javascript
-var Stop = require('stop');
+```
+$ npm install stop -g
+```
 
-//if `isStatic` is true, it will be compiled statically
-//if `isStatic` is false, it will be hosted for development
-var app = new Stop(isStatic);
+### Usage
 
-//exactly like route middleware
-//when static will become `/foo/index.html`
-app.get('/foo', function (req, res, next) {
-  res.send('bar');
-});
+```
+stop <source> <destination> [options]
+```
 
-//serve directory `/public` at route `/`
-app.directory('/', __dirname + '/public');
+Source can be a url, a port number (treated as `http://localhost:<source>`), a domain name (treated as `http://<source>`) or a path to a node.js app that, when started, will listen on a port.
 
-//Compatible with all the route middleware you'd expect
-//Plus `isStatic = true` automatically sets `NODE_ENV` to
-//production, so you often get automatic minification etc.
-app.get('/client.js', require('browserify-middleware')('./client.js'))
+```
+$ stop --help
 
-//pass output directory (used if static) and port number (used if dynamic)
-app.run('./out', 3000);
+Usage: stop <source> <destination> [options]
+
+Options:
+  --help, -h                Display usage information.                                  [boolean]
+  --minify-js, -j           Minify JavaScript using UglifyJS                            [boolean]
+  --minify-css, -c          Minify CSS using css-parse and css-stringify                [boolean]
+  --throttle, -t            The number of concurrent download to permit                 [default: 4]
+  --filter, --grep, -f, -g  Filter the paths to be downloaded using glob style strings  [string]
+
+$ stop example.com ./example.com --minify-js --minify-css
+$ stop 3000 ./localhost-3000 --minify-js --minify-css
+$ stop server.js ./sample-app --minify-js --minify-css
+```
+
+### Configuration
+
+To save you typing in the command line options every time, `stop` accepts [toml](https://github.com/mojombo/toml) configuration files in the location `.stop.toml`.  An example configuration file might look like:
+
+.stop.toml
+
+```toml
+source="./server.js"
+destination="./static"
+
+[options]
+minify-js=true
+minify-css=true
+throttle=10
+filter=["!/temp/**", "!/.git/**"]
 ```
 
 ## API
 
-## new Stop(isStatic)
+### Installation
 
-Must be called as a constructor.  The `isStatic` property determines 
+```
+$ npm install stop
+```
 
-### Stop#get(path, middleware...)
+### Example Usage
 
-Define a custom route from `path` to `middleware`.  You can have any code you like in middlware, which is where the real power of `Stop` comes form.
+```js
+var stop = require('stop')
+var options = {}
+stop('http://example.com', __dirname + '/static', options, function (err) {
+  console.log('done')
+})
+```
 
-Paths for "directories" will become "index.html" when compiled statically.
+### stop(source, destination, options, callback)
 
-### Stop#favicon(filepath)
-
-Use the favicon at `filepath` to respond to all requests for `/favicon.ico`
-
-### Stop#file(path, filepath)
-
-Serve the file at `filepath` for all requests for `path`.
-
-### Stop#directory(path, filepath)
-
-Serve the files in the directory `filepath` for requests for `path/*`.
-
-### Stop#run(path, port)
-
-Port is optional and a default one will be used if left out.  This either compiles the server statically or runs it dynamically.  It also sets `NODE_ENV` to `production` if true, so that anything that supports automated minification knows to enable it.
-
+ - `source` can be a domain name (e.g. `example.com`) a url (e.g. `http://example.com` or `http://example.com/foo`) or a port name (e.g. `3000` is equivalent to `http://localhost:3000`)
+ - `destination` is a path name, if it's relative it will be relative to the current working directory
+ - `options` can be ommitted if the defaults are being used
+   - `filter` exclude some URLs from the download
+   - `minify-js` or `minifyJS` set to `true` to minify all downloaded JavaScript
+   - `minify-css` or `minifyCSS` set to `true` to minify all downloaded CSS
+   - `throttle` (defaults to `4`) the number of parallel downloads permitted
+ - `callback` optional callback, if it's ommitted, a promise is returned instead
 ## License
 
   MIT
 
-
   If you find it useful, a payment via [gittip](https://www.gittip.com/ForbesLindesay) would be appreciated.
-
-![viewcount](https://viewcount.jepso.com/count/ForbesLindesay/stop.png)
