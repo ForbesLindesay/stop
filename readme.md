@@ -80,6 +80,7 @@ stop('http://example.com', __dirname + '/static', options, function (err) {
    - `minify-css` or `minifyCSS` set to `true` to minify all downloaded CSS
    - `throttle` (defaults to `4`) the number of parallel downloads permitted
  - `callback` optional callback, if it's ommitted, a promise is returned instead
+
 ## License
 
   MIT
