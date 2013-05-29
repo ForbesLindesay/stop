@@ -4,6 +4,7 @@ var url = require('url')
 var fs = require('fs')
 var join = require('path').join
 var dirname = require('path').dirname
+var Readable = require('stream').Readable || require('readable-stream').Readable
 
 var js = require('uglify-js').minify
 var css = require('css')
@@ -55,7 +56,8 @@ function fetch(site, dir, options, callback) {
       return Q.promise(function (resolve, reject) {
         hyperquest(site + pth, function (err, res) {
           if (err) return reject(err)
-          res.pause()
+          res.body = new Readable()
+          res.body.wrap(res)
           return resolve(res)
         })
       })
@@ -79,7 +81,7 @@ function fetch(site, dir, options, callback) {
       return []
     } else if ((res.headers['content-type'] && res.headers['content-type'].toLowerCase().indexOf('html') >= 0) || 
                 (!/\.[^\/]+$/.test(pth) && !res.headers['content-type'])) {
-      return concat(res)
+      return concat(res.body)
         .then(function (res) {
           var deps = parseDeps(res.toString())
             .map(function (dep) {
@@ -94,7 +96,7 @@ function fetch(site, dir, options, callback) {
           return writeFile(join(dir, /\.[a-zA-Z]{1,6}/.test(pth) ? pth : pth + '/index.html'), res).thenResolve(deps)
         })
     } else if (res.headers['content-type'] && res.headers['content-type'].toLowerCase().indexOf('css') >= 0) {
-      return concat(res)
+      return concat(res.body)
         .then(function (res) {
           var deps = []
 
@@ -108,7 +110,7 @@ function fetch(site, dir, options, callback) {
           return writeFile(join(dir, pth), res).thenResolve(deps)
         })
     } else if (minifyJS && res.headers['content-type'] && res.headers['content-type'].toLowerCase().indexOf('javascript') >= 0) {
-      return concat(res)
+      return concat(res.body)
         .then(function (res) {
           var deps = []
 
@@ -121,7 +123,7 @@ function fetch(site, dir, options, callback) {
           return writeFile(join(dir, pth), res).thenResolve(deps)
         })
     } else {
-      return write(join(dir, pth), res).thenResolve([])
+      return write(join(dir, pth), res.body).thenResolve([])
     }
   }
 }
@@ -138,7 +140,6 @@ function concat(stream) {
       if (err) return reject(err)
       else return resolve(res)
     }))
-    stream.resume()
   })
 }
 
@@ -183,7 +184,6 @@ function write(path, strm) {
         fstrm.on('error', reject)
         strm.on('error', reject)
         fstrm.on('close', resolve)
-        strm.resume()
       })
     })
 }
