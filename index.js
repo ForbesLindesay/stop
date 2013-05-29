@@ -105,6 +105,7 @@ function fetch(site, dir, options, callback) {
             res = css.stringify(parsed, {compress: true})
           } catch (ex) {
             //just don't minify
+            console.warn(ex.stack)
           }
 
           return writeFile(join(dir, pth), res).thenResolve(deps)
@@ -115,9 +116,10 @@ function fetch(site, dir, options, callback) {
           var deps = []
 
           try {
-            res = js(res).code
+            res = js(res.toString(), {fromString: true}).code
           } catch (ex) {
             //just don't minify
+            console.warn(ex.stack)
           }
 
           return writeFile(join(dir, pth), res).thenResolve(deps)
