@@ -1,6 +1,6 @@
 {
   "name": "stop",
-  "version": "2.1.2",
+  "version": "3.0.0-rc1",
   "description": "Make a dynamic website static by downloading it.",
   "repository": {
     "type": "git",
@@ -15,7 +15,8 @@
     "throat": "~1.0.0",
     "promise": "~4.0.0",
     "barrage": "~1.0.0",
-    "cssdeps": "~1.0.0"
+    "cssdeps": "~1.0.0",
+    "mkdirp": "~0.3.5"
   },
   "devDependencies": {
     "linify": "~1.0.1"

@@ -11,7 +11,22 @@ exports.addFavicon = require('./lib/favicon.js');
 exports.minify = require('./lib/minify.js');
 exports.addManifest = require('./lib/manifest.js');
 
+exports.writeFileSystem = require('./lib/write-file-system.js');
+
 exports.getWebsiteStream = getWebsiteStream;
+
+/**
+ * Gets a stream of web pages from a starting point
+ * where each object in the stream looks like:
+ *
+ * {
+ *   url: 'http://example.com/foo',
+ *   statusCode: 200,
+ *   headers: {},
+ *   body: <Buffer...>,
+ *   dependencies: []
+ * }
+ */
 function getWebsiteStream(start, options) {
   var highWaterMark = 2;
   if (options && options.highWaterMark) {
@@ -46,7 +61,6 @@ function getWebsiteStream(start, options) {
     if (inProgress === 0 && !finished && queue.length === 0) {
       finished = true;
       stream.push(null);
-      console.log('end');
     }
     if (queue.length === 0) {
       return;
@@ -59,7 +73,6 @@ function getWebsiteStream(start, options) {
         if (stream.push(result) && session.live) {
           process(session);
         } else {
-          if (session.live) console.log('pause');
           session.live = false;
         }
       } else if (session.live) {
@@ -77,7 +90,6 @@ function getWebsiteStream(start, options) {
   var session = {live: false};
   stream._read = function () {
     if (session.live) return;
-    console.log('start');
     session = {live: true};
     if (options && options.parallel) {
       for (var i = 0; i < options.parallel; i++) {
@@ -97,25 +109,3 @@ function isHttp(uri) {
 function filter(options, uri) {
   return !(options && options.filter && !options.filter(uri));
 }
-
-//download('http://www.iana.org/_js/2013.1/iana.js').done(console.dir);
-
-getWebsiteStream('http://lesscss.org', {
-  filter: function (currentURL) {
-    return true;
-    return url.parse(currentURL).hostname === 'lesscss.org';
-  },
-  parallel: 2
-})
-.syphon(require('./lib/favicon.js')())
-.syphon(require('./lib/manifest.js')('/app.manifest', {addLinks: true}))
-.on('data', function (res) {
-  console.log(res.statusCode + ': ' + res.url);
-})
-.on('error', function (err) {
-  throw err;
-})
-.on('end', function () {
-  console.log('stream ended');
-});
-
