@@ -1,6 +1,6 @@
 {
   "name": "stop",
-  "version": "2.1.2",
+  "version": "3.0.0-rc1",
   "description": "Make a dynamic website static by downloading it.",
   "repository": {
     "type": "git",
@@ -10,18 +10,13 @@
   "author": "ForbesLindesay",
   "license": "MIT",
   "dependencies": {
-    "concat-stream": "~0.1.1",
-    "q": "~0.9.3",
-    "mkdirp": "~0.3.5",
-    "htmlparser": "~1.7.6",
-    "throat": "0.0.0",
-    "hyperquest": "~0.1.5",
-    "minimatch": "~0.2.12",
-    "optimist": "~0.4.0",
-    "toml": "~0.4.1",
-    "uglify-js": "~2.3.2",
-    "css": "~1.1.0",
-    "readable-stream": "~1.0.2"
+    "then-request": "0.0.4",
+    "htmldeps": "~1.1.0",
+    "throat": "~1.0.0",
+    "promise": "~4.0.0",
+    "barrage": "~1.0.0",
+    "cssdeps": "~1.0.0",
+    "mkdirp": "~0.3.5"
   },
   "devDependencies": {
     "linify": "~1.0.1"

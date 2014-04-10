@@ -1,73 +1,30 @@
 # Stop
 
-  Make a dynamic website static by downloading it.
+Make a dynamic website static by downloading it.
 
-## Command Line
-
-### Installation
-
-```
-$ npm install stop -g
-```
-
-### Usage
-
-```
-stop <source> <destination> [options]
-```
-
-Source can be a url, a port number (treated as `http://localhost:<source>`), a domain name (treated as `http://<source>`) or a path to a node.js app that, when started, will listen on a port.
-
-```
-$ stop --help
-
-Usage: stop <source> <destination> [options]
-
-Options:
-  --help, -h                Display usage information.                                  [boolean]
-  --minify-js, -j           Minify JavaScript using UglifyJS                            [boolean]
-  --minify-css, -c          Minify CSS using css-parse and css-stringify                [boolean]
-  --throttle, -t            The number of concurrent download to permit                 [default: 4]
-  --filter, --grep, -f, -g  Filter the paths to be downloaded using glob style strings  [string]
-
-$ stop example.com ./example.com --minify-js --minify-css
-$ stop 3000 ./localhost-3000 --minify-js --minify-css
-$ stop server.js ./sample-app --minify-js --minify-css
-```
-
-### Configuration
-
-To save you typing in the command line options every time, `stop` accepts [toml](https://github.com/mojombo/toml) configuration files in the location `.stop.toml`.  An example configuration file might look like:
-
-.stop.toml
-
-```toml
-source="./server.js"
-destination="./static"
-
-[options]
-minify-js=true
-minify-css=true
-throttle=10
-filter=["!/temp/**", "!/.git/**"]
-```
-
-## API
-
-### Installation
+## Installation
 
 ```
 $ npm install stop
 ```
 
-### Example Usage
+## Example Usage
 
 ```js
-var stop = require('stop')
-var options = {}
-stop('http://example.com', __dirname + '/static', options, function (err) {
-  console.log('done')
+var stop = require('stop');
+
+getWebsiteStream('http://example.com', {
+  filter: function (currentURL) {
+    return url.parse(currentURL).hostname === 'example.com';
+  },
+  parallel: 1
 })
+.syphon(exports.addFavicon())
+.syphon(exports.addManifest('/app.manifest', {addLinks: true}))
+.syphon(exports.writeFileSystem(__dirname + '/output'))
+.wait().done(function () {
+  console.log('success');
+});
 ```
 
 ### stop(source, destination, options, callback)
