@@ -21,6 +21,10 @@ stop.getWebsiteStream('http://example.com', {
 })
 .syphon(stop.addFavicon())
 .syphon(stop.addManifest('/app.manifest', {addLinks: true}))
+.syphon(stop.minifyJS())
+.syphon(stop.minifyCSS({deadCode: true}))
+.syphon(stop.log())
+.syphon(stop.checkStatusCodes([200]))
 .syphon(stop.writeFileSystem(__dirname + '/output'))
 .wait().done(function () {
   console.log('success');

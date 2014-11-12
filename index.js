@@ -6,9 +6,11 @@ var Promise = require('promise');
 var throat = require('throat');
 var download = require('./lib/download.js');
 
+exports.log = require('./lib/log.js');
 exports.checkStatusCodes = require('./lib/status-codes.js');
 exports.addFavicon = require('./lib/favicon.js');
-exports.minify = require('./lib/minify.js');
+exports.minifyJS = require('./lib/minify-js.js');
+exports.minifyCSS = require('./lib/minify-css.js');
 exports.addManifest = require('./lib/manifest.js');
 
 exports.writeFileSystem = require('./lib/write-file-system.js');
