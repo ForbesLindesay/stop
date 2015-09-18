@@ -11,6 +11,7 @@ $ npm install stop
 ## Example Usage
 
 ```js
+var url = require('url');
 var stop = require('stop');
 
 stop.getWebsiteStream('http://example.com', {
