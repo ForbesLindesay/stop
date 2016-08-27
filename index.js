@@ -56,7 +56,7 @@ function getWebsiteStream(start, options) {
     });
   }
 
-  var queue = [start];
+  var queue = Array.isArray(start) ? start : [start];
   var finished = false;
   var inProgress = 0;
   function process(session) {
