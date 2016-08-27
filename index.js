@@ -45,7 +45,7 @@ function getWebsiteStream(start, options) {
   function handleUri(uri, push) {
     uri = uri.split('#')[0];
     if (downloaded[uri] === true || !isHttp(uri) || !filter(options, uri)) {
-      return Promise.from(null);
+      return Promise.resolve(null);
     }
     downloaded[uri] = true;
     return download(uri).then(function (result) {
