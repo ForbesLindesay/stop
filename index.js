@@ -3,7 +3,6 @@
 var url = require('url');
 var Readable = require('barrage').Readable;
 var Promise = require('promise');
-var throat = require('throat');
 var download = require('./lib/download.js');
 
 exports.log = require('./lib/log.js');
