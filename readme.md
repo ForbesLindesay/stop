@@ -1,5 +1,7 @@
 # Stop
 
+[![Greenkeeper badge](https://badges.greenkeeper.io/ForbesLindesay/stop.svg)](https://greenkeeper.io/)
+
 Make a dynamic website static by downloading it.
 
 ## Installation
